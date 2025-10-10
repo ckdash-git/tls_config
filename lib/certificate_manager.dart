@@ -76,32 +76,26 @@ String _bytesToPem(Uint8List bytes) {
     }
   }
 
-  Future<bool> validateCertificate(String host, String certificate) async {
-    try {
-      // Check if certificate is in trust store
-      if (await _trustStore.isTrusted(certificate)) {
-        return true;
-      }
+// lib/certificate_manager.dart
 
-      // Validate against custom CA
-      final result = await _channel.invokeMethod('validateCertificate', {
-        'host': host,
-        'certificate': certificate,
-      });
-      
-      if (result == true) {
-        // Store the validated certificate
-        await _trustStore.addCertificate(host, certificate);
-        return true;
-      }
-      
-      return false;
-    } catch (e) {
-      print('Certificate validation error: $e');
-      return false;
-    }
+Future<bool> validateCertificate(String host, String certificate) async {
+  try {
+    // ALWAYS delegate validation to the native side.
+    // This allows the native code to properly check the certificate against
+    // the custom root CA without being blocked by a faulty hash check.
+    final result = await _channel.invokeMethod('validateCertificate', {
+      'host': host,
+      'certificate': certificate,
+    });
+    
+    // The native code is the single source of truth for validation.
+    return result == true;
+    
+  } catch (e) {
+    print('Certificate validation error: $e');
+    return false;
   }
-
+}
   Future<Map<String, dynamic>> getCertificateInfo() async {
     try {
       final platformInfo = await _channel.invokeMethod('getCertificateInfo');
